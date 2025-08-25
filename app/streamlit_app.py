@@ -1,11 +1,11 @@
 import streamlit as st
-from similarity_search import vec, create_pdf_report, Synthesizer
+from similarity_search import vec, Synthesizer, create_pdf_report, clean_score_format
 import base64
 import PyPDF2
 import io
 import pandas as pd
 import numpy as np
-from fpdf import FPDF
+
 
 def chunk_text(text, chunk_size=8000):
     """Split text into chunks of specified size"""
@@ -76,62 +76,6 @@ def get_pdf_download_link(pdf_path):
         b64 = base64.b64encode(bytes).decode()
         href = f'<a href="data:application/pdf;base64,{b64}" download="contract_analysis_report.pdf">Download PDF Report</a>'
         return href
-
-def clean_score_format(text):
-    """Clean up the compliance score format from '71-100: Excellent Compliance' to '71/100'"""
-    if "Compliance Score:" in text:
-        try:
-            # Extract the number from the text
-            score = text.split(':')[1].strip()
-            if '-' in score:
-                score = score.split('-')[0].strip()  # Take the first number before the dash
-            if ':' in score:
-                score = score.split(':')[0].strip()  # Remove any remaining text after colon
-            return f"Compliance Score: {score}/100"
-        except:
-            return text
-    return text
-
-def create_pdf_report(response, filename="report.pdf"):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Set margins to give more space for content
-    pdf.set_left_margin(15)
-    pdf.set_right_margin(15)
-    
-    # Title
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Contract Analysis Report", ln=True, align='C')
-    pdf.ln(10)
-    
-    # Main answer section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Analysis Summary:", ln=True)
-    pdf.set_font("Helvetica", "", 11)
-    
-    # Split answer into paragraphs and clean markdown
-    paragraphs = response.answer.split('\n')
-    for para in paragraphs:
-        # Clean the paragraph of markdown characters
-        cleaned_para = para.replace('**', '').replace('*', '').strip()
-        if cleaned_para:  # Only process non-empty paragraphs
-            # Clean up compliance score format if present
-            cleaned_para = clean_score_format(cleaned_para)
-            
-            # Check if it's a header
-            if any(header in cleaned_para for header in ["Compliance Report:", "Strengths:", "Areas for Improvement:", "Reasoning:", "Additional Information:"]):
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.ln(5)
-                pdf.cell(0, 10, cleaned_para, ln=True)
-                pdf.set_font("Helvetica", "", 11)
-            else:
-                # Use multi_cell to handle line breaks properly
-                pdf.multi_cell(0, 7, cleaned_para)
-                pdf.ln(3)
-    
-    # Save the PDF
-    pdf.output(filename)
 
 def main():
     st.title("Contract Analysis System")

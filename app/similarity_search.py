@@ -8,39 +8,20 @@ from fpdf.enums import XPos, YPos
 # Initialize VectorStore
 vec = VectorStore()
 
-# --------------------------------------------------------------
-# Shipping question
-# --------------------------------------------------------------
-
-relevant_question = """[LOGO]
-AMENDMENT TO SECTION 2, PART B OF THE CO-BRANDING AGREEMENT
-This amendment to Section 2 (titled "Term"), Part B of the Co-Branding
-Agreement is made effective December 9, 1996 by and between PC Quote, Inc.
-(hereinafter referred to as "PCQ") and A.B. Watley, Inc. (hereinafter
-referred to as "ABW"), who are also the parties contracted in the
-aforementioned Co-Branding Agreement. This Amendment shall apply to said PCQ
-and ABW and all of their subsidiaries and related companies.
-[***]
-Source: PCQUOTE COM INC, S-1/A, 7/21/1999
-AGREED TO BY:
-/s/ Steven Malin /s/ Howard Meltzer
-- -------------------------- ---------------------------------
-A.B. Watley, Inc. PC Quote, Inc.
-Mr. Steven Malin Mr. Howard Meltzer
-Director President
-Date: 12/5/96 Date: 12/12/96
- -------------- ----------------"""
-results = vec.search(relevant_question, limit=3)
-
-# Create a metadata dictionary from the date columns
-results['metadata'] = results.apply(
-    lambda x: {
-        'agreement_date': x['agreement_date'],
-        'effective_date': x['effective_date'],
-        'expiration_date': x['expiration_date']
-    }, 
-    axis=1
-)
+def clean_score_format(text):
+    """Clean up the compliance score format from '71-100: Excellent Compliance' to '71/100'"""
+    if "Compliance Score:" in text:
+        try:
+            # Extract the number from the text
+            score = text.split(':')[1].strip()
+            if '-' in score:
+                score = score.split('-')[0].strip()  # Take the first number before the dash
+            if ':' in score:
+                score = score.split(':')[0].strip()  # Remove any remaining text after colon
+            return f"Compliance Score: {score}/100"
+        except:
+            return text
+    return text
 
 def create_pdf_report(response, filename="report.pdf"):
     pdf = FPDF()
@@ -66,13 +47,17 @@ def create_pdf_report(response, filename="report.pdf"):
         # Clean the paragraph of markdown characters
         cleaned_para = para.replace('**', '').replace('*', '').strip()
         if cleaned_para:  # Only process non-empty paragraphs
-            # Check if it's a header (like "Compliance Report:", "Strengths:", etc.)
+            # Clean up compliance score format if present
+            cleaned_para = clean_score_format(cleaned_para)
+            
+            # Check if it's a header
             if any(header in cleaned_para for header in ["Compliance Report:", "Strengths:", "Areas for Improvement:", "Reasoning:", "Additional Information:"]):
                 pdf.set_font("Helvetica", "B", 12)
                 pdf.ln(5)
                 pdf.cell(0, 10, cleaned_para, ln=True)
                 pdf.set_font("Helvetica", "", 11)
             else:
+                # Use multi_cell to handle line breaks properly
                 pdf.multi_cell(0, 7, cleaned_para)
                 pdf.ln(3)
     
@@ -107,84 +92,3 @@ def create_pdf_report(response, filename="report.pdf"):
     
     # Save the PDF
     pdf.output(filename)
-
-# Now use the correct columns
-response = Synthesizer.generate_response(
-    question=relevant_question, 
-    context=results[['content', 'metadata']]
-)
-
-# Create PDF report
-create_pdf_report(response)
-
-# You can still keep the console output if desired
-print(f"\n{response.answer}")
-print("\nThought process:")
-for thought in response.thought_process:
-    print(f"- {thought}")
-print(f"\nContext: {response.enough_context}")
-
-# --------------------------------------------------------------
-# Irrelevant question
-# --------------------------------------------------------------
-
-# irrelevant_question = "What is the weather in Tokyo?"
-# results = vec.search(irrelevant_question, limit=3)
-
-# # Create metadata dictionary
-# results['metadata'] = results.apply(
-#     lambda x: {
-#         'agreement_date': x['agreement_date'],
-#         'effective_date': x['effective_date'],
-#         'expiration_date': x['expiration_date']
-#     }, 
-#     axis=1
-# )
-
-# response = Synthesizer.generate_response(
-#     question=irrelevant_question, 
-#     context=results[['content', 'metadata']]
-# )
-
-# print(f"\n{response.answer}")
-# print("\nThought process:")
-# for thought in response.thought_process:
-#     print(f"- {thought}")
-# print(f"\nContext: {response.enough_context}")
-
-# # --------------------------------------------------------------
-# # Date-based filtering
-# # --------------------------------------------------------------
-
-# # Remove or comment out the date_range filtering for now
-# # date_range = {
-# #     "effective_date": (datetime(2024, 1, 1), datetime(2024, 12, 31))
-# # }
-
-# results = vec.search(
-#     relevant_question, 
-#     limit=3
-#     # Remove date_range parameter until VectorStore.search() supports it
-#     # date_range=date_range  
-# )
-
-# # Create metadata dictionary
-# results['metadata'] = results.apply(
-#     lambda x: {
-#         'agreement_date': x['agreement_date'],
-#         'effective_date': x['effective_date'],
-#         'expiration_date': x['expiration_date']
-#     }, 
-#     axis=1
-# )
-
-# response = Synthesizer.generate_response(
-#     question=relevant_question, 
-#     context=results[['content', 'metadata']]
-# )
-
-# print(f"\n{response.answer}")
-# print("\nThought process:")
-# for thought in response.thought_process:
-#     print(f"- {thought}")
-# print(f"\nContext: {response.enough_context}")
